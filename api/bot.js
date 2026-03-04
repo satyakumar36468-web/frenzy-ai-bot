@@ -41,6 +41,6 @@ export default async function handler(req, res) {
 
     res.status(200).send("OK");
   } catch (error) {
-    res.status(200).send("Error");
+  console.log("ERROR:", error.response?.data || error.message);
+  res.status(500).send("Error occurred");
   }
-}

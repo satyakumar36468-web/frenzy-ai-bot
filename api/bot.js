@@ -1,52 +1,42 @@
-import axios from "axios";
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(200).send("Bot is running");
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const message = req.body.message;
-    if (!message || !message.text) {
-      return res.status(200).send("No message");
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
     }
 
-    const chatId = message.chat.id;
-    const userText = message.text;
-
-    // DeepSeek API Call
-    const aiResponse = await axios.post(
-      "https://api.deepseek.com/chat/completions",
-      {
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`
+      },
+      body: JSON.stringify({
         model: "deepseek-chat",
         messages: [
-          { role: "system", content: "You are a helpful AI assistant." },
-          { role: "user", content: userText }
-        ]
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: message }
+        ],
+        temperature: 0.7
+      })
+    });
 
-    const reply =
-      aiResponse.data.choices?.[0]?.message?.content || "No reply";
+    const data = await response.json();
 
-    // Send reply back to Telegram
-    await axios.post(
-      `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
-      {
-        chat_id: chatId,
-        text: reply
-      }
-    );
+    if (!response.ok) {
+      return res.status(500).json({ error: data });
+    }
 
-    return res.status(200).send("OK");
+    return res.status(200).json({
+      reply: data.choices[0].message.content
+    });
+
   } catch (error) {
-    console.log("ERROR:", error.response?.data || error.message);
-    return res.status(500).send("Error occurred");
+    return res.status(500).json({ error: error.message });
   }
 }
